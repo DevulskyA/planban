@@ -44,7 +44,7 @@ Planban is exposed as MCP tools whose names end in \`planban_<operation>\`: stat
 ## Lean reads — leitura econômica obrigatória
 
 - Comece por \`planban_status\`.
-- Para localizar trabalho, use \`planban_query_cards\` com filtros de status, \`hierarchyScope: "leaf"\` e \`compact: true\`.
+- Para uma lista de rotina, use \`planban_query_cards\` com filtros de status, \`hierarchyScope: "leaf"\` e \`lean: true\`; use \`compact: true\` quando precisar dos Items completos sem as projeções repetidas.
 - Só use \`planban_get_card\` ou \`planban_read_doc\` depois de escolher o cartão em que vai trabalhar.
 - Não leia o quadro inteiro para responder uma pergunta sobre um cartão.
 

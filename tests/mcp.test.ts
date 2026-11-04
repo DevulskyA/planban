@@ -177,6 +177,7 @@ test("Planban MCP server registers focused tools", () => {
   assert.equal("programmeId" in queryProperties, false);
   assert.equal("programmeRole" in queryProperties, false);
   assert.equal((queryProperties.compact as { type?: string })?.type, "boolean");
+  assert.equal((queryProperties.lean as { type?: string })?.type, "boolean");
   for (const toolName of ["planban_create_card", "planban_create_group", "planban_create_cards", "planban_update_card", "planban_write_doc"]) {
     assert.match(tools.find((tool) => tool.name === toolName)?.description ?? "", /Planban house style/u);
   }
@@ -404,9 +405,11 @@ test("Planban MCP compact query preserves matches without repeated hierarchy pro
       { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
       { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf" } } },
       { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf", compact: true } } },
+      { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf", lean: true } } },
     ], { PLANBAN_HOME: planbanHome });
     const full = responses[1].result.structuredContent;
     const compact = responses[2].result.structuredContent;
+    const lean = responses[3].result.structuredContent;
     assert.deepEqual(compact.items.map((item: { id: string }) => item.id), full.matches.map((entry: { item: { id: string } }) => entry.item.id));
     assert.deepEqual(compact.counts, full.counts);
     assert.equal(compact.wip, full.wip);
@@ -414,6 +417,9 @@ test("Planban MCP compact query preserves matches without repeated hierarchy pro
     assert.equal("context" in compact, false);
     assert.equal("visible" in compact, false);
     assert.ok(JSON.stringify(compact).length < JSON.stringify(full).length);
+    assert.deepEqual(Object.keys(lean.items[0]).sort(), ["id", "nextAction", "status", "title"]);
+    assert.ok(lean.items[0].nextAction.length <= 80);
+    assert.ok(JSON.stringify(lean).length < JSON.stringify(compact).length);
   });
 });
 

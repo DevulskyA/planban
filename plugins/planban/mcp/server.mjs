@@ -216,6 +216,20 @@ function compactQueryResult(result) {
   };
 }
 
+function leanQueryResult(result) {
+  return {
+    query: result.query,
+    items: result.matches.map(({ item }) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      nextAction: item.nextAction ? item.nextAction.slice(0, 80) : null,
+    })),
+    counts: result.counts,
+    wip: result.wip,
+  };
+}
+
 const DEFAULT_BOARD_ORIGIN = "http://127.0.0.1:4317";
 const BOARD_URL_PROBE_TIMEOUT_MS = 600;
 
@@ -569,6 +583,7 @@ const tools = [
       blocked: { type: "string", enum: ["any", "blocked", "unblocked"] },
       tags: { type: "array", items: { type: "string" } },
       compact: { type: "boolean", description: "Return only matched Items, counts, and WIP; omit repeated context, visible projection, and ancestry." },
+      lean: { type: "boolean", description: "Return only status, id, title, and nextAction (80 chars) per Item." },
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -862,7 +877,7 @@ async function callToolImpl(name, args) {
     const board = await boardStaleness(state);
     const staleness = Object.fromEntries(result.matches.flatMap((entry) => board.cards[entry.item.id] ? [[entry.item.id, board.cards[entry.item.id]]] : []));
     const staleCount = Object.keys(staleness).length;
-    const payload = args.compact === true ? compactQueryResult(result) : result;
+    const payload = args.lean === true ? leanQueryResult(result) : args.compact === true ? compactQueryResult(result) : result;
     return textResult(withLine(
       `Matched ${result.matches.length} Planban Work Items at revision ${state.roadmap.revision}.`,
       staleCount ? `${staleCount} matched Item${staleCount === 1 ? " has" : "s have"} stale signals (see staleness).` : null,
