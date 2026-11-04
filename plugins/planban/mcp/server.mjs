@@ -207,6 +207,15 @@ function compactBoardSummary(state) {
   return { ...summary, itemCount: roadmapItems.length };
 }
 
+function compactQueryResult(result) {
+  return {
+    query: result.query,
+    items: result.matches.map(({ item }) => item),
+    counts: result.counts,
+    wip: result.wip,
+  };
+}
+
 const DEFAULT_BOARD_ORIGIN = "http://127.0.0.1:4317";
 const BOARD_URL_PROBE_TIMEOUT_MS = 600;
 
@@ -559,6 +568,7 @@ const tools = [
       statuses: { type: "array", items: { type: "string", enum: [...PLANBAN_STATUSES] } },
       blocked: { type: "string", enum: ["any", "blocked", "unblocked"] },
       tags: { type: "array", items: { type: "string" } },
+      compact: { type: "boolean", description: "Return only matched Items, counts, and WIP; omit repeated context, visible projection, and ancestry." },
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -852,6 +862,7 @@ async function callToolImpl(name, args) {
     const board = await boardStaleness(state);
     const staleness = Object.fromEntries(result.matches.flatMap((entry) => board.cards[entry.item.id] ? [[entry.item.id, board.cards[entry.item.id]]] : []));
     const staleCount = Object.keys(staleness).length;
+    const payload = args.compact === true ? compactQueryResult(result) : result;
     return textResult(withLine(
       `Matched ${result.matches.length} Planban Work Items at revision ${state.roadmap.revision}.`,
       staleCount ? `${staleCount} matched Item${staleCount === 1 ? " has" : "s have"} stale signals (see staleness).` : null,
@@ -859,7 +870,7 @@ async function callToolImpl(name, args) {
       cwd: state.cwd,
       repoId: state.manifest.repoId,
       revision: state.roadmap.revision,
-      ...result,
+      ...payload,
       staleness,
     });
   }
