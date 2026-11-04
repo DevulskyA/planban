@@ -571,7 +571,7 @@ const tools = [
   {
     name: "planban_query_cards",
     title: "Query Planban Work Items",
-    description: "Search and compose projection, hierarchy, Group-role, status, blocked, and tag filters without changing roadmap state.",
+    description: "Search and compose projection, hierarchy, Group-role, status, blocked, and tag filters without changing roadmap state. Cost policy: always use lean=true for listing or discovery; request the full response only after selecting a card or when all details are explicitly needed.",
     inputSchema: schema.object({
       ...commonBoardProperties,
       search: { type: "string", description: "Search id, title, summary, next action, and tags." },
