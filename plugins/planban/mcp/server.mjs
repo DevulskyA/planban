@@ -218,6 +218,41 @@ function compactBoardSummary(state) {
   return { ...summary, itemCount: roadmapItems.length, ...(state.onlineReplay ?? {}) };
 }
 
+
+function compactQueryResult(result) {
+  return {
+    query: result.query,
+    items: result.matches.map(({ item }) => item),
+    counts: result.counts,
+    wip: result.wip,
+  };
+}
+
+function leanQueryResult(result) {
+  const query = {};
+  if (result.query.search) query.search = result.query.search;
+  if (result.query.projection !== "main") query.projection = result.query.projection;
+  if (result.query.groupId) query.groupId = result.query.groupId;
+  if (result.query.hierarchyScope !== "projection") query.scope = result.query.hierarchyScope;
+  if (result.query.groupRole !== "any") query.role = result.query.groupRole;
+  if (result.query.statuses.length) query.statuses = result.query.statuses;
+  if (result.query.blocked !== "any") query.blocked = result.query.blocked;
+  if (result.query.tags.length) query.tags = result.query.tags;
+
+  const counts = Object.fromEntries(Object.entries(result.counts).filter(([, count]) => count));
+  return {
+    ...(Object.keys(query).length ? { query } : {}),
+    items: result.matches.map(({ item }) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...(item.nextAction ? { nextAction: item.nextAction.slice(0, 80) } : {}),
+    })),
+    counts,
+    wip: result.wip,
+  };
+}
+
 const DEFAULT_BOARD_ORIGIN = "http://127.0.0.1:4317";
 const BOARD_URL_PROBE_TIMEOUT_MS = 600;
 
@@ -583,7 +618,7 @@ const tools = [
   {
     name: "planban_query_cards",
     title: "Query Planban Work Items",
-    description: "Search and compose projection, hierarchy, Group-role, status, blocked, and tag filters without changing roadmap state.",
+    description: "Search and compose projection, hierarchy, Group-role, status, blocked, and tag filters without changing roadmap state. Cost policy: use lean=true for listing or discovery; lean returns a token-efficient projection with active filters, sparse counts, WIP, repoId, revision and staleIds when applicable. If compact and lean are both true, lean takes precedence.",
     inputSchema: schema.object({
       ...commonBoardProperties,
       search: { type: "string", description: "Search id, title, summary, next action, and tags." },
@@ -594,6 +629,8 @@ const tools = [
       statuses: { type: "array", items: { type: "string", enum: [...PLANBAN_STATUSES] } },
       blocked: { type: "string", enum: ["any", "blocked", "unblocked"] },
       tags: { type: "array", items: { type: "string" } },
+      compact: { type: "boolean", description: "Return only matched Items, counts, and WIP; omit repeated context, visible projection, and ancestry." },
+      lean: { type: "boolean", description: "Return a token-efficient discovery response with id, title, status, optional nextAction up to 80 characters, active filters, sparse counts, WIP, repoId, revision and staleIds when applicable. If compact and lean are both true, lean takes precedence." },
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -977,17 +1014,23 @@ async function callToolImpl(name, args) {
     const board = await boardStaleness(state);
     const staleness = Object.fromEntries(result.matches.flatMap((entry) => board.cards[entry.item.id] ? [[entry.item.id, board.cards[entry.item.id]]] : []));
     const staleCount = Object.keys(staleness).length;
+    const lean = args.lean === true;
+    const payload = lean ? leanQueryResult(result) : args.compact === true ? compactQueryResult(result) : result;
     const stalenessNotes = board.notes ?? [];
-    return textResult(withLine(withLine(
-      `Matched ${result.matches.length} Planban Work Items at revision ${state.roadmap.revision}.`,
-      staleCount ? `${staleCount} matched Item${staleCount === 1 ? " has" : "s have"} stale signals (see staleness).` : null,
-    ), stalenessNotes.join(" ") || null), {
-      cwd: state.cwd,
+    const text = lean
+      ? `${result.matches.length} match${result.matches.length === 1 ? "" : "es"} at revision ${state.roadmap.revision}.`
+      : withLine(withLine(
+        `Matched ${result.matches.length} Planban Work Items at revision ${state.roadmap.revision}.`,
+        staleCount ? `${staleCount} matched Item${staleCount === 1 ? " has" : "s have"} stale signals (see staleness).` : null,
+      ), stalenessNotes.join(" ") || null);
+    return textResult(text, {
+      ...(lean ? {} : { cwd: state.cwd }),
       repoId: state.manifest.repoId,
       revision: state.roadmap.revision,
-      ...result,
-      staleness,
-      ...(stalenessNotes.length ? { stalenessNotes } : {}),
+      ...payload,
+      ...(lean
+        ? (staleCount ? { staleIds: Object.keys(staleness) } : {})
+        : { staleness, ...(stalenessNotes.length ? { stalenessNotes } : {}) }),
     });
   }
 
