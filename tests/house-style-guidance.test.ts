@@ -57,6 +57,8 @@ test("generated agent context invokes the installed policy without copying it", 
   });
 
   assert.match(context, /installed Planban protocol and Planban house style/u);
+  assert.match(context, /lean: true/iu);
+  assert.match(context, /compact: true/iu);
   assert.doesNotMatch(context, /Information locations and ownership/u);
 });
 
