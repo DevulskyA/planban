@@ -5,7 +5,7 @@
   "mcpVersion": "2.0.0",
   "storageSchemaVersion": 2,
   "minimumStorageSchemaVersion": 2,
-  "publishedAt": "2026-10-15T00:00:00.000Z",
+  "publishedAt": "2026-11-05T00:00:00.000Z",
   "sourceUrl": "https://github.com/planban-ai/planban",
   "releaseNotesUrl": "https://github.com/planban-ai/planban/releases/tag/v2.0.0",
   "summary": "Planban 2.0.0 adds Online Boards: take a board online to share it, open it in any browser or on your phone, and connect ChatGPT and Claude. Local boards stay free and need no account.",
