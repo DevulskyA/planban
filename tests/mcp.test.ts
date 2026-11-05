@@ -421,6 +421,39 @@ test("Planban MCP queries owned Items without mutation", async () => {
   });
 });
 
+
+test("Planban MCP query projections preserve identity while reducing discovery payloads", async () => {
+  await withPlanbanProject(async ({ cwd, planbanHome, cardId }) => {
+    await createCard({ cwd, title: "Compact Result", parentId: cardId, status: "up-next", nextAction: "Validate compact output" });
+    await createCard({ cwd, title: "No Next Action", parentId: cardId, status: "up-next", nextAction: "" });
+    const responses = runMcpServer([
+      { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf" } } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf", compact: true } } },
+      { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf", lean: true } } },
+      { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "planban_query_cards", arguments: { cwd, statuses: ["up-next"], hierarchyScope: "leaf", lean: true, compact: true } } },
+    ], { PLANBAN_HOME: planbanHome });
+
+    const full = responses[1].result.structuredContent;
+    const compact = responses[2].result.structuredContent;
+    const lean = responses[3].result.structuredContent;
+    const both = responses[4].result.structuredContent;
+
+    assert.deepEqual(compact.items.map((item: { id: string }) => item.id), full.matches.map((entry: { item: { id: string } }) => entry.item.id));
+    assert.deepEqual(compact.counts, full.counts);
+    assert.deepEqual(compact.wip, full.wip);
+    assert.ok(JSON.stringify(compact).length < JSON.stringify(full).length);
+    assert.ok(JSON.stringify(lean).length < JSON.stringify(compact).length);
+    assert.deepEqual(both, lean);
+
+    assert.equal("cwd" in lean, false);
+    assert.equal("projection" in (lean.query ?? {}), false);
+    assert.equal("complete" in lean.counts, false);
+    assert.equal("nextAction" in lean.items.find((item: { title: string }) => item.title === "No Next Action"), false);
+    assert.ok(lean.items.find((item: { title: string }) => item.title === "Compact Result").nextAction.length <= 80);
+  });
+});
+
 test("Planban MCP reconstructs existing hierarchy and exports a recoverable flat board", async () => {
   await withPlanbanProject(async ({ cwd, planbanHome, cardId }) => {
     await createCard({ cwd, title: "Existing Item", status: "pending" });
